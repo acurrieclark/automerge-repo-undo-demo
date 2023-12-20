@@ -186,7 +186,7 @@
 	></div>
 </div>
 
-<style global>
+<style>
 	.grid-bg {
 		position: relative;
 		/* diameter of the circle */
@@ -220,6 +220,34 @@
 
 	:global(.ui-resizable-handle) {
 		opacity: 0;
+	}
+
+	:global(.grid-stack-item > .ui-resizable-e),
+	:global(.grid-stack-item > .ui-resizable-w) {
+		width: 8px;
+		top: 8px;
+		bottom: 8px;
+	}
+
+	:global(.grid-stack-item > .ui-resizable-n),
+	:global(.grid-stack-item > .ui-resizable-s) {
+		height: 8px;
+		left: 8px;
+		right: 8px;
+	}
+
+	:global(.grid-stack-item > .ui-resizable-ne),
+	:global(.grid-stack-item > .ui-resizable-sw) {
+		width: 8px;
+		height: 8px;
+		transform: rotate(45deg);
+	}
+
+	:global(.grid-stack-item > .ui-resizable-nw),
+	:global(.grid-stack-item > .ui-resizable-se) {
+		width: 8px;
+		height: 8px;
+		transform: rotate(-45deg);
 	}
 
 	:global(.gs-24 > .grid-stack-item) {
