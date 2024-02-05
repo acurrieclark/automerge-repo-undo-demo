@@ -139,6 +139,42 @@
 		}
 	}
 
+	let previousPointerOffset: { x: number; y: number } | null = null;
+
+	// returns n, s, e, w, ne, nw, se, sw depending on which side or corner we are near
+	const resizeDirection = (pointerOffset: { x: number; y: number }, element: Element) => {
+		if (!previousPointerOffset) {
+			previousPointerOffset = pointerOffset;
+			return null;
+		}
+		const xDiff = pointerOffset.x - previousPointerOffset.x;
+		const yDiff = pointerOffset.y - previousPointerOffset.y;
+
+		const rect = element.getBoundingClientRect();
+		const { x, y } = pointerOffset;
+		const edgeSize = 8;
+		const { left, top, width, height } = rect;
+		const right = left + width;
+		const bottom = top + height;
+		const nearNorthEast = (y < top + edgeSize && x > right - (width / 2)) || (y < top + (height / 2) && x > right - edgeSize);
+		const nearSouthEast = (y > bottom - edgeSize && x > right - (width / 2)) || (y > bottom - (height / 2) && x > right - edgeSize);
+		const nearSouthWest = (y > bottom - edgeSize && x < left + (width / 2)) || (y > bottom - (height / 2) && x < left + edgeSize);
+		const nearNorthWest = (y < top + edgeSize && x < left + (width / 2)) || (y < top + (height / 2) && x < left + edgeSize);
+		if (nearNorthEast && xDiff > 0 && yDiff < 0) {
+			return 'ne';
+		}
+		if (nearNorthWest && xDiff < 0 && yDiff < 0) {
+			return 'nw';
+		}
+		if (nearSouthEast && xDiff > 0 && yDiff > 0) {
+			return 'se';
+		}
+		if (nearSouthWest && xDiff < 0 && yDiff > 0) {
+			return 'sw';
+		}
+		return null;
+	};
+
 	const mouseDown = (event: MouseEvent) => {
 		if (event.target !== gridContainer) {
 			return;
@@ -153,11 +189,29 @@
 			id: nanoid()
 		});
 
-		const dragElement = newElement.querySelector('.ui-resizable-se');
+		const mouseMove = (event: MouseEvent) => {
+			const direction = resizeDirection({ x: event.clientX, y: event.clientY }, newElement);
 
-		dragElement?.dispatchEvent(
-			new MouseEvent('mousedown', { clientX: event.clientX, clientY: event.clientY })
-		);
+			if (direction) {
+				console.log('resize', direction);
+				const dragElement = newElement.querySelector('.ui-resizable-' + direction);
+				dragElement?.dispatchEvent(
+					new MouseEvent('mousedown', { clientX: event.clientX, clientY: event.clientY })
+				);
+				document.removeEventListener('mousemove', mouseMove);
+				document.removeEventListener('mouseup', mouseUp);
+				previousPointerOffset = null;
+			}
+		};
+
+		const mouseUp = () => {
+			previousPointerOffset = null;
+			document.removeEventListener('mousemove', mouseMove);
+			document.removeEventListener('mouseup', mouseUp);
+		};
+
+		document.addEventListener('mousemove', mouseMove);
+		document.addEventListener('mouseup', mouseUp);
 	};
 
 	onDestroy(() => {
