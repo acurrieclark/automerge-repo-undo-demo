@@ -15,6 +15,7 @@
   import { createEntityState } from "$lib/helpers/entity-state";
   import { nanoid } from "nanoid";
   import { UndoRedoStore } from "$lib/undo-redo-store";
+  import { BrowserWebSocketClientAdapter } from "@automerge/automerge-repo-network-websocket";
 
   const initialData: GridData = {
     children: createEntityState([{ x: 1, y: 1, w: 2, h: 2, id: nanoid() }]),
@@ -39,7 +40,10 @@
   onMount(() => {
     const repo = new Repo({
       storage: new IndexedDBStorageAdapter("undo-redo-tests"),
-      network: [new BroadcastChannelNetworkAdapter({ channelName: "undo-redo-tests" })],
+      network: [
+        new BroadcastChannelNetworkAdapter({ channelName: "undo-redo-tests" }),
+        new BrowserWebSocketClientAdapter("wss://sync.automerge.org"),
+      ],
     });
 
     const params = getParams();

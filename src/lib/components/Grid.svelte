@@ -15,6 +15,7 @@
   import { derived, readable } from "svelte/store";
   import Button from "./menu/Button.svelte";
   import type { UndoRedoStore } from "$lib/undo-redo-store";
+  import { getHeads } from "@automerge/automerge";
 
   export let undoHandle: AutomergeRepoUndoRedo<GridData>;
   export let stateHandle: AutomergeRepoUndoRedo<GridState>;
@@ -44,6 +45,8 @@
   const gridData = readable<GridData>(undoHandle.handle.docSync(), (set) => {
     const listener = (data: DocHandleChangePayload<GridData>) => {
       set(data.doc);
+
+      console.log(JSON.parse(JSON.stringify(data.doc.children.entities)), getHeads(data.doc));
     };
 
     undoHandle.handle.on("change", listener);

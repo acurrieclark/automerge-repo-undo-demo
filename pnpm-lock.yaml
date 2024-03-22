@@ -14,6 +14,9 @@ dependencies:
   '@automerge/automerge-repo-network-broadcastchannel':
     specifier: ^1.1.4
     version: 1.1.4(@types/node@20.11.30)(typescript@5.4.3)
+  '@automerge/automerge-repo-network-websocket':
+    specifier: ^1.1.4
+    version: 1.1.4(@types/node@20.11.30)(typescript@5.4.3)
   '@automerge/automerge-repo-storage-indexeddb':
     specifier: ^1.1.4
     version: 1.1.4(@types/node@20.11.30)(typescript@5.4.3)
@@ -131,6 +134,25 @@ packages:
       - '@types/node'
       - supports-color
       - typescript
+    dev: false
+
+  /@automerge/automerge-repo-network-websocket@1.1.4(@types/node@20.11.30)(typescript@5.4.3):
+    resolution: {integrity: sha512-CTo3VvLRnuhE7sAg8oFnMyvfzZolKT8WSizQHIMlv4AlEbOc/e54wEwfZ09ySaabwT8u8eVj5R3WCvfVdkkSBA==}
+    dependencies:
+      '@automerge/automerge-repo': 1.1.4(@types/node@20.11.30)(typescript@5.4.3)
+      cbor-x: 1.5.8
+      debug: 4.3.4
+      eventemitter3: 5.0.1
+      isomorphic-ws: 5.0.0(ws@8.16.0)
+      ws: 8.16.0
+    transitivePeerDependencies:
+      - '@swc/core'
+      - '@swc/wasm'
+      - '@types/node'
+      - bufferutil
+      - supports-color
+      - typescript
+      - utf-8-validate
     dev: false
 
   /@automerge/automerge-repo-storage-indexeddb@1.1.4(@types/node@20.11.30)(typescript@5.4.3):
@@ -2015,6 +2037,14 @@ packages:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
     dev: true
 
+  /isomorphic-ws@5.0.0(ws@8.16.0):
+    resolution: {integrity: sha512-muId7Zzn9ywDsyXgTIafTry2sV3nySZeUDe6YedVd1Hvuuep5AsIlqK+XefWpYTyJG5e503F2xIuT2lcU6rCSw==}
+    peerDependencies:
+      ws: '*'
+    dependencies:
+      ws: 8.16.0
+    dev: false
+
   /jackspeak@2.3.6:
     resolution: {integrity: sha512-N3yCS/NegsOBokc8GAdM8UcmfsKiSS8cipheD/nivzr700H+nsMOxJjQnvwOcRYVuFkdH0wGUvW2WbXGmrZGbQ==}
     engines: {node: '>=14'}
@@ -3116,6 +3146,19 @@ packages:
   /wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
     dev: true
+
+  /ws@8.16.0:
+    resolution: {integrity: sha512-HS0c//TP7Ina87TfiPUz1rQzMhHrl/SG2guqRcTOIUYD2q8uhUdNHZYJUaQ8aTGPzCh+c6oawMKW35nFl1dxyQ==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+    dev: false
 
   /xstate@4.38.3:
     resolution: {integrity: sha512-SH7nAaaPQx57dx6qvfcIgqKRXIh4L0A1iYEqim4s1u7c9VoCgzZc+63FY90AKU4ZzOC2cfJzTnpO4zK7fCUzzw==}
