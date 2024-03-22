@@ -14,15 +14,15 @@ export default defineConfig({
     noExternal: ["gridstack"],
   },
   resolve: {
-    alias: {
-      "@onsetsoftware/automerge-patcher": path.resolve(
-        __dirname,
-        "../packages/npm/automerge-patcher/src",
-      ),
-      "@onsetsoftware/automerge-repo-undo-redo": path.resolve(
-        __dirname,
-        "../packages/npm/automerge-repo-undo-redo/src",
-      ),
-    },
+    // alias: {
+    //   "@onsetsoftware/automerge-patcher": path.resolve(
+    //     __dirname,
+    //     "../packages/npm/automerge-patcher/src",
+    //   ),
+    //   "@onsetsoftware/automerge-repo-undo-redo": path.resolve(
+    //     __dirname,
+    //     "../packages/npm/automerge-repo-undo-redo/src",
+    //   ),
+    // },
   },
 });
