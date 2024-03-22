@@ -1,448 +1,96 @@
 <script lang="ts">
-	import { nanoid } from 'nanoid';
-	import 'gridstack/dist/gridstack.min.css';
-	import {
-		GridStack,
-		type GridItemHTMLElement,
-		type GridStackNode,
-		type GridStackOptions,
-		type GridStackWidget
-	} from 'gridstack';
-	import { onDestroy } from 'svelte';
+  import Grid from "$lib/components/Grid.svelte";
+  import {
+    Repo,
+    type DocumentId,
+    DocHandle,
+    type DocHandleEphemeralMessagePayload,
+  } from "@automerge/automerge-repo";
+  import { AutomergeRepoUndoRedo, UndoRedoManager } from "@onsetsoftware/automerge-repo-undo-redo";
+  import { onMount, setContext } from "svelte";
+  import { getParams, setParams } from "$lib/helpers/url";
+  import type { GridData, GridState } from "$lib/types/grid-data.type";
+  import { IndexedDBStorageAdapter } from "@automerge/automerge-repo-storage-indexeddb";
+  import { BroadcastChannelNetworkAdapter } from "@automerge/automerge-repo-network-broadcastchannel";
+  import { createEntityState } from "$lib/helpers/entity-state";
+  import { nanoid } from "nanoid";
+  import { UndoRedoStore } from "$lib/undo-redo-store";
 
-	let gridContainer: HTMLDivElement;
+  const initialData: GridData = {
+    children: createEntityState([{ x: 1, y: 1, w: 2, h: 2, id: nanoid() }]),
+    rows: 3,
+  };
 
-	let grid: GridStack;
+  const initialState: GridState = {
+    selected: [],
+  };
 
-	let columns = 24;
+  let handle: DocHandle<GridData>;
+  let state: DocHandle<GridState>;
+  let undoHandle: AutomergeRepoUndoRedo<GridData>;
+  let stateHandle: AutomergeRepoUndoRedo<GridState>;
 
-	let rows = 3;
+  const rootUndoManager = new UndoRedoManager();
 
-	let rowHeight = 33;
+  setContext("undoManager", rootUndoManager);
+  const undoStore = new UndoRedoStore(rootUndoManager);
+  setContext("undoStore", undoStore);
 
-	$: grid?.column(columns);
+  onMount(() => {
+    const repo = new Repo({
+      storage: new IndexedDBStorageAdapter("undo-redo-tests"),
+      network: [new BroadcastChannelNetworkAdapter({ channelName: "undo-redo-tests" })],
+    });
 
-	let savedGrid: GridStackOptions;
+    const params = getParams();
+    const id = params.id as DocumentId | undefined;
+    handle = id ? repo.find(id) : repo.create(initialData);
 
-	const boxes: Record<string, GridItemHTMLElement> = {};
+    const stateId = params.state as DocumentId | undefined;
+    state = stateId ? repo.find(stateId) : repo.create(initialState);
 
-	const unlisteners: (() => void)[] = [];
-	const initGrid = async (rows: number, columns: number) => {
-		saveGrid();
-		destroyGrid();
+    const setStateHandle = (newState: DocHandle<GridState>) => {
+      state = newState;
+      state.off("ephemeral-message", recieveMessage);
+      state.on("ephemeral-message", recieveMessage);
+      stateHandle = rootUndoManager.addHandle(state);
+      setParams({ id: handle.documentId, state: state.documentId });
+    };
 
-		const bigOne: GridStackWidget = { x: 1, y: 1, w: 2, h: 2, content: 'Big one', id: nanoid() };
-		const litleOne: GridStackWidget = {
-			x: 4,
-			y: 2,
-			w: 1,
-			h: 1,
-			content: 'Little one',
-			id: nanoid()
-		};
+    const recieveMessage = ({ message }: DocHandleEphemeralMessagePayload<GridState>) => {
+      if (message === "knock-knock") {
+        state.broadcast("who's there?");
+        return;
+      }
+      if (message === "who's there?") {
+        const newState = repo.clone(state);
+        newState.whenReady().then(() => {
+          setStateHandle(newState);
+        });
+      }
+    };
 
-		const defaultGrid = {
-			children: [],
-			animate: false,
-			float: true,
-			row: rows,
-			column: columns,
-			margin: 0,
-			cellHeight: rowHeight,
-			resizable: {
-				handles: 'all'
-			}
-		};
+    state.whenReady().then(() => {
+      setTimeout(() => {
+        state.broadcast("knock-knock");
+      });
+    });
 
-		let selected: string | null = null;
+    state.on("ephemeral-message", recieveMessage);
+    setParams({ id: handle.documentId, state: state.documentId });
+    undoHandle = rootUndoManager.addHandle(handle);
+    stateHandle = rootUndoManager.addHandle(state);
 
-		const selectBox = (box: GridItemHTMLElement, toggle = false) => {
-			selected === box.id ?? null;
-			if (toggle) {
-				box.classList.toggle('selected');
-				selected = selected === box.id ? null : box.id;
-			} else {
-				selected = box.id;
-				box.classList.add('selected');
-			}
-			Object.values(boxes).forEach((b) => {
-				if (b !== box) {
-					b.classList.remove('selected');
-				}
-			});
-		};
-
-		const gridToUse = savedGrid
-			? { ...savedGrid, cellHeight: rowHeight, column: columns, row: rows, children: [] }
-			: defaultGrid;
-
-		const children = savedGrid ? savedGrid.children : [bigOne, litleOne];
-
-		grid = GridStack.init(gridToUse, gridContainer)
-			.on('added', (event: Event, items: GridStackNode[]) => {
-				items.forEach((item) => {
-					if (item.el === undefined || item.id === undefined) {
-						return;
-					}
-
-					boxes[item.id] = item.el;
-					const listener = (event: MouseEvent) => {
-						if (item.el === undefined) {
-							return;
-						}
-						selectBox(item.el, event.metaKey);
-					};
-					item.el?.addEventListener('click', listener);
-
-					unlisteners.push(() => {
-						item.el?.removeEventListener('click', listener);
-					});
-
-					selectBox(item.el);
-				});
-			})
-			.on('dragstart', (event: Event, el: GridItemHTMLElement) => {
-				if (el === undefined) {
-					return;
-				}
-				selectBox(el);
-			})
-			.on('resizestart', (event: Event, el: GridItemHTMLElement) => {
-				if (el === undefined) {
-					return;
-				}
-				selectBox(el);
-			});
-
-		grid.load(children ?? []);
-	};
-
-	const saveGrid = () => {
-		if (grid !== undefined) {
-			savedGrid = grid.save(true, true) as GridStackOptions;
-		}
-	};
-
-	const destroyGrid = () => {
-		if (grid !== undefined) {
-			grid.removeAll();
-			grid.destroy(false);
-			unlisteners.forEach((unlistener) => {
-				unlistener();
-			});
-		}
-	};
-
-	$: {
-		if (gridContainer !== undefined) {
-			initGrid(rows, columns);
-		}
-	}
-
-	let previousPointerOffset: { x: number; y: number } | null = null;
-
-	// returns n, s, e, w, ne, nw, se, sw depending on which side or corner we are near
-	const resizeDirection = (pointerOffset: { x: number; y: number }, element: Element) => {
-		if (!previousPointerOffset) {
-			previousPointerOffset = pointerOffset;
-			return null;
-		}
-		const xDiff = pointerOffset.x - previousPointerOffset.x;
-		const yDiff = pointerOffset.y - previousPointerOffset.y;
-
-		const rect = element.getBoundingClientRect();
-		const { x, y } = pointerOffset;
-		const edgeSize = 8;
-		const { left, top, width, height } = rect;
-		const right = left + width;
-		const bottom = top + height;
-		const nearNorthEast = (y < top + edgeSize && x > right - (width / 2)) || (y < top + (height / 2) && x > right - edgeSize);
-		const nearSouthEast = (y > bottom - edgeSize && x > right - (width / 2)) || (y > bottom - (height / 2) && x > right - edgeSize);
-		const nearSouthWest = (y > bottom - edgeSize && x < left + (width / 2)) || (y > bottom - (height / 2) && x < left + edgeSize);
-		const nearNorthWest = (y < top + edgeSize && x < left + (width / 2)) || (y < top + (height / 2) && x < left + edgeSize);
-		if (nearNorthEast && xDiff > 0 && yDiff < 0) {
-			return 'ne';
-		}
-		if (nearNorthWest && xDiff < 0 && yDiff < 0) {
-			return 'nw';
-		}
-		if (nearSouthEast && xDiff > 0 && yDiff > 0) {
-			return 'se';
-		}
-		if (nearSouthWest && xDiff < 0 && yDiff > 0) {
-			return 'sw';
-		}
-		return null;
-	};
-
-	const mouseDown = (event: MouseEvent) => {
-		if (event.target !== gridContainer) {
-			return;
-		}
-		const cell = grid.getCellFromPixel({ left: event.offsetX, top: event.offsetY });
-		const newElement = grid.addWidget({
-			x: cell.x,
-			y: cell.y,
-			w: 1,
-			h: 1,
-			content: 'New widget',
-			id: nanoid()
-		});
-
-		const mouseMove = (event: MouseEvent) => {
-			const direction = resizeDirection({ x: event.clientX, y: event.clientY }, newElement);
-
-			if (direction) {
-				console.log('resize', direction);
-				const dragElement = newElement.querySelector('.ui-resizable-' + direction);
-				dragElement?.dispatchEvent(
-					new MouseEvent('mousedown', { clientX: event.clientX, clientY: event.clientY })
-				);
-				document.removeEventListener('mousemove', mouseMove);
-				document.removeEventListener('mouseup', mouseUp);
-				previousPointerOffset = null;
-			}
-		};
-
-		const mouseUp = () => {
-			previousPointerOffset = null;
-			document.removeEventListener('mousemove', mouseMove);
-			document.removeEventListener('mouseup', mouseUp);
-		};
-
-		document.addEventListener('mousemove', mouseMove);
-		document.addEventListener('mouseup', mouseUp);
-	};
-
-	onDestroy(() => {
-		destroyGrid();
-	});
-
-	let width: number;
-	let height: number;
-	let columnWidth: number;
-	$: columnWidth = width / columns;
+    return () => {
+      state.off("ephemeral-message", recieveMessage);
+    };
+  });
 </script>
 
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to read the documentation</p>
-
-<button on:click={() => rows++}>Add Row</button>
-
-<div class="grid-bg" style="--column-width: {columnWidth + 'px'}; --row-height: {rowHeight + 'px'}">
-	<div
-		role="grid"
-		tabindex="-1"
-		bind:this={gridContainer}
-		bind:clientHeight={height}
-		bind:clientWidth={width}
-		on:mousedown={mouseDown}
-	></div>
-</div>
-
-<style>
-	.grid-bg {
-		position: relative;
-		/* diameter of the circle */
-		--d: 2px;
-
-		background: radial-gradient(
-				circle at var(--d) var(--d),
-				#333 calc(var(--d) - 1px),
-				#0000 var(--d)
-			)
-			0 0 / var(--column-width) var(--row-height);
-
-		padding: 2px;
-		margin-top: 2px;
-	}
-
-	:global(.grid-stack) {
-		position: relative;
-	}
-
-	:global(.grid-stack-item.selected) {
-		outline: 2px solid #07c;
-		z-index: 2;
-	}
-
-	:global(.grid-stack-item-content) {
-		background-color: white;
-		border: 1px solid #ddd;
-		user-select: none;
-	}
-
-	:global(.ui-resizable-handle) {
-		opacity: 0;
-	}
-
-	:global(.grid-stack-item > .ui-resizable-e),
-	:global(.grid-stack-item > .ui-resizable-w) {
-		width: 8px;
-		top: 8px;
-		bottom: 8px;
-	}
-
-	:global(.grid-stack-item > .ui-resizable-n),
-	:global(.grid-stack-item > .ui-resizable-s) {
-		height: 8px;
-		left: 8px;
-		right: 8px;
-	}
-
-	:global(.grid-stack-item > .ui-resizable-ne),
-	:global(.grid-stack-item > .ui-resizable-sw) {
-		width: 8px;
-		height: 8px;
-		transform: rotate(45deg);
-	}
-
-	:global(.grid-stack-item > .ui-resizable-nw),
-	:global(.grid-stack-item > .ui-resizable-se) {
-		width: 8px;
-		height: 8px;
-		transform: rotate(-45deg);
-	}
-
-	:global(.gs-24 > .grid-stack-item) {
-		width: 4.167%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='1']) {
-		left: 4.167%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='2']) {
-		width: 8.333%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='2']) {
-		left: 8.333%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='3']) {
-		width: 12.5%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='3']) {
-		left: 12.5%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='4']) {
-		width: 16.667%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='4']) {
-		left: 16.667%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='5']) {
-		width: 20.833%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='5']) {
-		left: 20.833%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='6']) {
-		width: 25%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='6']) {
-		left: 25%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='7']) {
-		width: 29.167%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='7']) {
-		left: 29.167%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='8']) {
-		width: 33.333%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='8']) {
-		left: 33.333%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='9']) {
-		width: 37.5%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='9']) {
-		left: 37.5%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='10']) {
-		width: 41.667%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='10']) {
-		left: 41.667%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='11']) {
-		width: 45.833%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='11']) {
-		left: 45.833%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='12']) {
-		width: 50%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='12']) {
-		left: 50%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='13']) {
-		width: 54.167%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='13']) {
-		left: 54.167%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='14']) {
-		width: 58.333%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='14']) {
-		left: 58.333%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='15']) {
-		width: 62.5%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='15']) {
-		left: 62.5%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='16']) {
-		width: 66.667%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='16']) {
-		left: 66.667%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='17']) {
-		width: 70.833%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='17']) {
-		left: 70.833%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='18']) {
-		width: 75%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='18']) {
-		left: 75%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='19']) {
-		width: 79.167%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='19']) {
-		left: 79.167%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='20']) {
-		width: 83.333%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='20']) {
-		left: 83.333%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='21']) {
-		width: 87.5%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='21']) {
-		left: 87.5%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='22']) {
-		width: 91.667%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='22']) {
-		left: 91.667%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='23']) {
-		width: 95.833%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-x='23']) {
-		left: 95.833%;
-	}
-	:global(.gs-24 > .grid-stack-item[gs-w='24']) {
-		width: 100%;
-	}
-</style>
+{#if undoHandle}
+  {#await Promise.all([handle.whenReady(), state.whenReady()])}
+    <p>Loading...</p>
+  {:then}
+    <Grid {undoHandle} {stateHandle} />
+  {/await}
+{/if}
