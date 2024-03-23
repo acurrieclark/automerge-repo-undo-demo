@@ -16,6 +16,7 @@
   import { nanoid } from "nanoid";
   import { UndoRedoStore } from "$lib/undo-redo-store";
   import { BrowserWebSocketClientAdapter } from "@automerge/automerge-repo-network-websocket";
+  import { Toaster } from "svelte-sonner";
 
   const initialData: GridData = {
     children: createEntityState([{ x: 1, y: 1, w: 2, h: 2, id: nanoid() }]),
@@ -98,3 +99,5 @@
     <Grid {undoHandle} {stateHandle} />
   {/await}
 {/if}
+
+<Toaster />

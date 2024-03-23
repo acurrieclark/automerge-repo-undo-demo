@@ -16,6 +16,7 @@
   import Button from "./menu/Button.svelte";
   import type { UndoRedoStore } from "$lib/undo-redo-store";
   import { getHeads } from "@automerge/automerge";
+  import { toast } from "svelte-sonner";
 
   export let undoHandle: AutomergeRepoUndoRedo<GridData>;
   export let stateHandle: AutomergeRepoUndoRedo<GridState>;
@@ -46,7 +47,7 @@
     const listener = (data: DocHandleChangePayload<GridData>) => {
       set(data.doc);
 
-      console.log(JSON.parse(JSON.stringify(data.doc.children.entities)), getHeads(data.doc));
+      console.log(JSON.parse(JSON.stringify(data.doc.children)), getHeads(data.doc), data.patches);
     };
 
     undoHandle.handle.on("change", listener);
@@ -150,6 +151,14 @@
                 }
               });
             }, "Add Box");
+            toast.success("Box added", {
+              action: {
+                label: "Undo",
+                onClick: () => {
+                  undoStore.undo();
+                },
+              },
+            });
           }
 
           boxes[item.id] = item.el;
@@ -197,6 +206,15 @@
             }
           });
         }, "Move Box");
+
+        toast.success("Box moved", {
+          action: {
+            label: "Undo",
+            onClick: () => {
+              undoStore.undo();
+            },
+          },
+        });
       })
       .on("resizestart", (_: Event, el: GridItemHTMLElement) => {
         manipulatingCell = true;
@@ -230,6 +248,14 @@
             }
           });
         }, "Resize Box");
+        toast.success("Box resized", {
+          action: {
+            label: "Undo",
+            onClick: () => {
+              undoStore.undo();
+            },
+          },
+        });
       });
 
     grid.load(children ?? []);
@@ -321,6 +347,14 @@
       },
       ids.length > 1 ? "Remove Boxes" : "Remove Box",
     );
+    toast.success(ids.length > 1 ? "Boxes Removed" : "Box Removed", {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          undoStore.undo();
+        },
+      },
+    });
   };
 
   const mouseDown = (event: MouseEvent) => {
